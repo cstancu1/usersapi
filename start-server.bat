@@ -1,0 +1,1 @@
+environment\scripts\activate && docker-compose up -d && uvicorn server:app --reload
