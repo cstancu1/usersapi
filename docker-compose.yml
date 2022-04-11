@@ -1,0 +1,67 @@
+version: '3'
+
+services:
+    gateway-api:
+        build:
+            context: ./usersManager
+            dockerfile: Dockerfile
+        ports:
+            - "8801:8801"
+        restart: on-failure
+        environment:
+            - DEBUG=False
+            - TITLE=Gateway & users management API
+            - VERSION=0.0.1
+            - DEPLOY_MODE=dev
+            - ACCESS_TOKEN_EXPIRE_MINUTES=360
+            - JWT_PRIVATE_KEY=server.key
+            - JWT_PUBLIC_KEY=public_key
+            - MONGO_USER=ASDASDASD
+            - MONGO_PASSWORD=123456
+            - MONGO_HOST=mongo
+            - MONGO_PORT=27017
+            - MONGO_DB_NAME=users
+            - SURVEYS_API_URL=http://surveys-api:8802
+        entrypoint: ["uvicorn", "--proxy-headers", "server:app", "--host", "0.0.0.0", "--port", "8801"]
+        volumes: 
+            - ./usersManager:/server
+
+    surveys-api:
+        build:
+            context: ./surveysAPI
+            dockerfile: Dockerfile
+        ports:
+            - "8802:8802"
+        restart: on-failure
+        environment:
+            - DEBUG=False
+            - TITLE=Surveys management API
+            - VERSION=0.0.1
+            - DEPLOY_MODE=dev
+            - MONGO_USER=ASDASDASD
+            - MONGO_PASSWORD=123456
+            - MONGO_HOST=mongo
+            - MONGO_PORT=27017
+            - MONGO_DB_NAME=users
+            - surveys_api=surveys-api
+        entrypoint: ["uvicorn", "--proxy-headers", "server:app", "--host", "0.0.0.0", "--port", "8802"]
+        volumes: 
+            - ./surveysAPI:/server
+
+
+    mongo:
+        image: mongo
+        restart: always
+        environment:
+            MONGO_INITDB_ROOT_USERNAME: ASDASDASD
+            MONGO_INITDB_ROOT_PASSWORD: 123456
+
+    mongo-express:
+        image: mongo-express
+        restart: always
+        ports:
+            - 8081:8081
+        environment:
+            ME_CONFIG_MONGODB_ADMINUSERNAME: ASDASDASD
+            ME_CONFIG_MONGODB_ADMINPASSWORD: 123456
+            ME_CONFIG_MONGODB_URL: mongodb://ASDASDASD:123456@mongo:27017/
