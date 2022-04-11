@@ -1,9 +1,11 @@
 from datetime import datetime, timedelta
+import logging
 from fastapi import HTTPException, Header
 import jwt
 import config
 from common.error_codes import INVALID_OR_MISSING_TOKEN, EXPIRED_TOKEN
 from persistence.models import UserFromDb
+from persistence.dbaccess import database
 
 def access_token(user: UserFromDb):
     exp_time = datetime.now() + timedelta(minutes=30)
@@ -13,7 +15,8 @@ def access_token(user: UserFromDb):
         'user_id': user.id,
         'user_name': user.username,
         'company_id': user.company_id,
-        'team_id': user.team_id
+        'team_id': user.team_id,
+        'access': user.access
     }
     encoded_jwt = jwt.encode(
         token_data, 
@@ -23,7 +26,10 @@ def access_token(user: UserFromDb):
     return encoded_jwt
 
 def check_token(token: str):
-    decoded = jwt.decode(token, config.JWT_PUBLIC_KEY, algorithms=["RS256"])
+    try:
+        decoded = jwt.decode(token, config.JWT_PUBLIC_KEY, algorithms=["RS256"])
+    except Exception:
+        raise HTTPException(status_code=400, detail=EXPIRED_TOKEN)
     if decoded["exp"] < datetime.timestamp(datetime.now()):
         raise HTTPException(status_code=400, detail=EXPIRED_TOKEN)
     return {
@@ -35,21 +41,27 @@ def check_token(token: str):
 class TokenRequired:
 
     @staticmethod
-    def user_active(X_Authentication_Token: str = Header(None)):
+    async def user_active(X_Authentication_Token: str = Header(None)):
         try:
             data = check_token(X_Authentication_Token)
-            return data
-        except Exception:
+            #Retrieve user from db and return it as dict
+            user_object = await database.retrieve('users', {"_id":data["token_data"]["user_id"]})
+            return user_object
+        except Exception as ex:
+            logging.exception(ex)
             raise HTTPException(status_code=400, detail=INVALID_OR_MISSING_TOKEN)
 
     @staticmethod
-    def has_permission(
+    async def has_permission(
         app: str = None, 
+        company: str = None,
         action: str = None,
         X_Authentication_Token: str = Header(None),
         ):
         try:
             data = check_token(X_Authentication_Token)
-            return data
+            user_object = await database.retrieve('users', {"_id":data.token_data.user_id})
+            return user_object
         except Exception:
             raise HTTPException(status_code=401, detail=INVALID_OR_MISSING_TOKEN)
+
